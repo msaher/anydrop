@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"html/template"
 	"net"
 	"os"
+	"io"
 	"flag"
 	"path/filepath"
 	"github.com/skip2/go-qrcode"
@@ -13,6 +15,7 @@ import (
 
 type App struct {
 	downloadPath string
+	uploadTemplate *template.Template
 }
 
 func (app *App) download(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +48,50 @@ func (app *App) download(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), file)
 
 	return
+}
+
+func (app *App) getUpload(w http.ResponseWriter, r *http.Request) {
+	err := app.uploadTemplate.Execute(w, nil)
+	if err != nil {
+		panic(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (app *App) postUpload(w http.ResponseWriter, r *http.Request) {
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "failed to read file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	uploadDir := "anydrop"
+	err = os.MkdirAll(uploadDir, 0755)
+	if err != nil {
+		http.Error(w, "failed to create upload dir", http.StatusInternalServerError)
+		return
+	}
+
+	dstPath := filepath.Join(uploadDir, filepath.Base(header.Filename))
+	// TODO: dont overwrite file immediately. Make sure it does not exist already,
+	// and if it does append timestamp or something
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		http.Error(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, file)
+	if _, err := io.Copy(dst, file); err != nil {
+		http.Error(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "File uploaded: %s\n", header.Filename)
+	log.Printf("Uploaded file: %s from %s", header.Filename, r.RemoteAddr)
 }
 
 func logHandler(next http.Handler) http.Handler {
@@ -103,6 +150,10 @@ func isPathAccessible(path string) error {
 
 func main() {
 	var app App
+
+	// check template is fine
+	app.uploadTemplate = template.Must(template.New("upload").ParseFiles("ui/upload.html"))
+
 	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
 	flag.Parse()
 
@@ -128,6 +179,8 @@ func main() {
 	// register handlers
 	mux := http.NewServeMux()
 	mux.HandleFunc("/download", app.download)
+	mux.HandleFunc("GET /upload", app.getUpload)
+	mux.HandleFunc("POST /upload", app.postUpload)
 	handler := logHandler(mux)
 
 	log.SetFlags(0) // dont want dates in logger
@@ -145,14 +198,25 @@ func main() {
 	}
 	ipv4 := ip.IP.To4()
 	url := fmt.Sprintf("http://%s%s", ipv4, server.Addr)
-	urlDownload := fmt.Sprintf("%s/download", url)
 
-	qr, err := qrcode.New(urlDownload, qrcode.Low)
+	urlUpload := fmt.Sprintf("%s/upload", url)
+	qr, err := qrcode.New(urlUpload, qrcode.Low)
 	if err != nil {
 		// show error but dont exit.
 		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s", err)
 	} else {
-		fmt.Println(qr.ToSmallString(true))
+		fmt.Print("Upload QR:")
+		fmt.Print(qr.ToSmallString(true))
+	}
+
+	urlDownload := fmt.Sprintf("%s/download", url)
+	qr, err = qrcode.New(urlDownload, qrcode.Low)
+	if err != nil {
+		// show error but dont exit.
+		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s", err)
+	} else {
+		fmt.Print("Download QR:")
+		fmt.Print(qr.ToSmallString(true))
 	}
 
 	fmt.Printf("Listening on %s\n", url)
