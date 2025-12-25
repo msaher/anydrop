@@ -8,6 +8,7 @@ import (
 )
 
 func myIp(interfaceName string) (*net.IPNet, error) {
+	w.Header().Set("Cache-Control", "no-store")
 func myIp() (*net.IPNet, error) {
 	// get first non-loopback address
 	ifaces, err := net.Interfaces()
