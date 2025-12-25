@@ -8,6 +8,7 @@ import (
 )
 
 func myIp(interfaceName string) (*net.IPNet, error) {
+func myIp() (*net.IPNet, error) {
 	// get first non-loopback address
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -78,7 +79,7 @@ func main() {
 		Handler: mux,
 	}
 
-	ip, err := myIp("wlan0")
+	ip, err := myIp()
 	if err != nil {
 		panic(err)
 	}
