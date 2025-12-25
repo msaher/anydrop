@@ -6,16 +6,17 @@ import (
 	"net"
 	"os"
 	"flag"
+	"path/filepath"
 )
 
 type App struct {
-	downloadFileName string
+	downloadPath string
 }
 
 func (app *App) download(w http.ResponseWriter, r *http.Request) {
-	fileName := app.downloadFileName
+	path := app.downloadPath
 
-	stat, err := os.Stat(fileName)
+	stat, err := os.Stat(path)
 	if err != nil {
 		http.Error(w, "stat failed", 500)
 		return
@@ -25,7 +26,7 @@ func (app *App) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := os.Open(fileName)
+	file, err := os.Open(path)
 	if err != nil {
 		http.Error(w, "can't open file", 500)
 		return
@@ -36,6 +37,7 @@ func (app *App) download(w http.ResponseWriter, r *http.Request) {
 	// different files
 	w.Header().Set("Cache-Control", "no-store")
 
+	fileName := filepath.Base(path)
 	attachment := fmt.Sprintf(`attachment; filename="%s"`, fileName)
 	w.Header().Set("Content-Disposition", attachment)
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), file)
@@ -93,22 +95,22 @@ func isPathAccessible(path string) error {
 func main() {
 	var app App
 
-	flag.StringVar(&app.downloadFileName, "download", "", "file to download on /download")
+	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
 	flag.Parse()
 
-	if app.downloadFileName == "" {
+	if app.downloadPath == "" {
 		fmt.Fprintf(os.Stderr, "must specify a -download path")
 		return
 	}
 
 	// check file is accessiable
-	err := isPathAccessible(app.downloadFileName)
+	err := isPathAccessible(app.downloadPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "download file: %s", err)
 		return
 	}
 	// try to open it just incase
-	file, err := os.Open(app.downloadFileName)
+	file, err := os.Open(app.downloadPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "download file: %s", err)
 		return
