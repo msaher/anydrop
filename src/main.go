@@ -7,6 +7,7 @@ import (
 	"os"
 	"flag"
 	"path/filepath"
+	"github.com/skip2/go-qrcode"
 )
 
 type App struct {
@@ -132,7 +133,18 @@ func main() {
 		panic(err)
 	}
 	ipv4 := ip.IP.To4()
-	fmt.Printf("Listening on http://%s%s\n", ipv4, server.Addr)
+	url := fmt.Sprintf("http://%s%s", ipv4, server.Addr)
+	urlDownload := fmt.Sprintf("%s/download", url)
+
+	qr, err := qrcode.New(urlDownload, qrcode.Low)
+	if err != nil {
+		// show error but dont exit.
+		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s", err)
+	} else {
+		fmt.Println(qr.ToSmallString(true))
+	}
+
+	fmt.Printf("Listening on %s\n", url)
 	err = server.ListenAndServe()
 	if err != nil {
 		panic(err)
