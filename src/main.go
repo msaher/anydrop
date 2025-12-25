@@ -8,6 +8,7 @@ import (
 	"flag"
 	"path/filepath"
 	"github.com/skip2/go-qrcode"
+	"log"
 )
 
 type App struct {
@@ -44,6 +45,13 @@ func (app *App) download(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), file)
 
 	return
+}
+
+func logHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+	    next.ServeHTTP(writer, req)
+	    log.Printf("%s %s\n", req.Method, req.URL.Path)
+	})
 }
 
 func myIp() (*net.IPNet, error) {
@@ -95,7 +103,6 @@ func isPathAccessible(path string) error {
 
 func main() {
 	var app App
-
 	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
 	flag.Parse()
 
@@ -121,11 +128,15 @@ func main() {
 	// register handlers
 	mux := http.NewServeMux()
 	mux.HandleFunc("/download", app.download)
+	handler := logHandler(mux)
+
+	log.SetFlags(0) // dont want dates in logger
+
 
 	addr := ":8000"
 	server := http.Server {
 		Addr: addr,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	ip, err := myIp()
