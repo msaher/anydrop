@@ -14,22 +14,28 @@ type App struct {
 
 func (app *App) download(w http.ResponseWriter, r *http.Request) {
 	fileName := app.downloadFileName
-	file, err := os.Open(fileName)
-	if err != nil {
-		w.Header().Set("Content-Type", "text/plain")
-		msg := fmt.Sprintf("not found: %s", fileName)
-		http.Error(w, msg, 404)
-		return
-	}
-	defer file.Close()
 
-	stat, err := file.Stat()
+	stat, err := os.Stat(fileName)
 	if err != nil {
 		http.Error(w, "stat failed", 500)
 		return
 	}
+	if stat.IsDir() {
+		http.Error(w, "somehow got a directory", 500)
+		return
+	}
 
+	file, err := os.Open(fileName)
+	if err != nil {
+		http.Error(w, "can't open file", 500)
+		return
+	}
+	defer file.Close()
+
+	// no cache. We may use the same url but we may have
+	// different files
 	w.Header().Set("Cache-Control", "no-store")
+
 	attachment := fmt.Sprintf(`attachment; filename="%s"`, fileName)
 	w.Header().Set("Content-Disposition", attachment)
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), file)
@@ -73,6 +79,16 @@ func myIp() (*net.IPNet, error) {
 	return nil, fmt.Errorf("couldn't find an Ipv4 address")
 }
 
+func isPathAccessible(path string) error {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if stat.IsDir() {
+		return fmt.Errorf("`%s` is a directory", path)
+	}
+	return nil
+}
 
 func main() {
 	var app App
@@ -82,7 +98,22 @@ func main() {
 
 	if app.downloadFileName == "" {
 		fmt.Fprintf(os.Stderr, "must specify a -download path")
+		return
 	}
+
+	// check file is accessiable
+	err := isPathAccessible(app.downloadFileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "download file: %s", err)
+		return
+	}
+	// try to open it just incase
+	file, err := os.Open(app.downloadFileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "download file: %s", err)
+		return
+	}
+	file.Close()
 
 	// register handlers
 	mux := http.NewServeMux()
