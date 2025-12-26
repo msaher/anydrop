@@ -14,12 +14,15 @@ import (
 	"errors"
 	"io/fs"
 	"strings"
+	"crypto/rand"
+	"encoding/hex"
 )
 
 type App struct {
 	downloadPath string
 	uploadDir string
 	template *template.Template
+	token string
 }
 
 func (app *App) DownloadPath() (string, bool) {
@@ -74,6 +77,7 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 		uploadDir = app.uploadDir
 	}
 	data["uploadDir"] = uploadDir
+	data["token"] = app.token
 
 	err = app.template.Execute(w, data)
 	if err != nil {
@@ -114,12 +118,24 @@ func (app *App) postUpload(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Uploaded file: %s from %s", header.Filename, r.RemoteAddr)
 }
 
-func logHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-	    next.ServeHTTP(writer, req)
-	    log.Printf("%s %s\n", req.Method, req.URL.Path)
+func (app *App) withToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("token")
+		if token != app.token {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
+
+func logHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	    next.ServeHTTP(w, r)
+	    log.Printf("%s %s\n", r.Method, r.URL.Path)
+	})
+}
+
 
 func myIp() (*net.IPNet, error) {
 	// get first non-loopback address
@@ -155,6 +171,15 @@ func myIp() (*net.IPNet, error) {
 	}
 
 	return nil, fmt.Errorf("couldn't find an Ipv4 address")
+}
+
+func newToken(numBytes int) (string, error) {
+    b := make([]byte, numBytes)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", nil
+	}
+    return hex.EncodeToString(b), nil
 }
 
 // Changes /home/user/foo to ~/foo
@@ -217,6 +242,13 @@ func main() {
 	var app App
 	app.template = template.Must(template.New("home").ParseFiles("ui/home.html"))
 
+	token, err := newToken(8)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Can't create token: %s\n", err)
+		return
+	}
+	app.token = token
+
 	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
 	flag.StringVar(&app.uploadDir, "upload-dir", "", "upload directory. Defaults to cwd")
 
@@ -266,14 +298,15 @@ func main() {
 	}
 
 	// register handlers
+	var handler http.Handler
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.home)
 	mux.HandleFunc("/download", app.download)
 	mux.HandleFunc("POST /upload", app.postUpload)
-	handler := logHandler(mux)
+	handler = app.withToken(mux)
+	handler = logHandler(handler)
 
 	log.SetFlags(0) // dont want dates in logger
-
 
 	addr := ":8000"
 	server := http.Server {
@@ -286,7 +319,7 @@ func main() {
 		panic(err)
 	}
 	ipv4 := ip.IP.To4()
-	url := fmt.Sprintf("http://%s%s", ipv4, server.Addr)
+	url := fmt.Sprintf("http://%s%s?token=%s", ipv4, server.Addr, app.token)
 	fmt.Printf("Listening on %s\n", url)
 
 	qr, err := qrcode.New(url, qrcode.Low)
