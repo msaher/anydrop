@@ -250,7 +250,8 @@ func main() {
 	app.token = token
 
 	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
-	flag.StringVar(&app.uploadDir, "upload-dir", "", "upload directory. Defaults to cwd")
+	flag.StringVar(&app.uploadDir, "upload-dir", "", "upload directory (default cwd)")
+	port := flag.Int("port", 8000, "port to listen to")
 
 	flag.Parse()
 
@@ -308,7 +309,7 @@ func main() {
 
 	log.SetFlags(0) // dont want dates in logger
 
-	addr := ":8000"
+	addr := fmt.Sprintf(":%d", *port)
 	server := http.Server {
 		Addr: addr,
 		Handler: handler,
