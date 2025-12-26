@@ -61,8 +61,10 @@ func (app *App) download(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) home(w http.ResponseWriter, r *http.Request) {
 	data := make(map[string]any)
-	_, showDownload := app.DownloadPath()
-	data["showDownload"] = showDownload
+	downloadPath, exists := app.DownloadPath()
+	if exists {
+		data["downloadBasename"] = filepath.Base(downloadPath)
+	}
 	err := app.template.Execute(w, data)
 	if err != nil {
 		panic(err)
