@@ -140,7 +140,6 @@ func logHandler(next http.Handler) http.Handler {
 	})
 }
 
-
 func myIp() (*net.IPNet, error) {
 	// get first non-loopback address
 	ifaces, err := net.Interfaces()
