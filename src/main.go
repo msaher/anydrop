@@ -11,10 +11,13 @@ import (
 	"path/filepath"
 	"github.com/skip2/go-qrcode"
 	"log"
+	"errors"
+	"io/fs"
 )
 
 type App struct {
 	downloadPath string
+	uploadDir string
 	template *template.Template
 }
 
@@ -81,16 +84,12 @@ func (app *App) postUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	uploadDir := "anydrop"
-	err = os.MkdirAll(uploadDir, 0755)
+	dstPath, err := uniquePath(app.uploadDir, filepath.Base(header.Filename))
 	if err != nil {
-		http.Error(w, "failed to create upload dir", http.StatusInternalServerError)
+		http.Error(w, "failed to find a safe place to save", http.StatusInternalServerError)
 		return
 	}
 
-	dstPath := filepath.Join(uploadDir, filepath.Base(header.Filename))
-	// TODO: dont overwrite file immediately. Make sure it does not exist already,
-	// and if it does append timestamp or something
 	dst, err := os.Create(dstPath)
 	if err != nil {
 		http.Error(w, "failed to save file", http.StatusInternalServerError)
@@ -151,7 +150,38 @@ func myIp() (*net.IPNet, error) {
 	return nil, fmt.Errorf("couldn't find an Ipv4 address")
 }
 
-func isPathAccessible(path string) error {
+func uniquePath(dir, name string) (string, error) {
+	path := filepath.Join(dir, name)
+	ext := filepath.Ext(path)
+	noext := name[:len(name)-len(ext)]
+
+	i := 1
+	for {
+		_ , err := os.Stat(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			return path, nil
+		}
+		if err != nil {
+			return "", err
+		}
+		base := fmt.Sprintf("%s_%d%s", noext, i, ext)
+		path = filepath.Join(dir, base)
+		i++
+	}
+}
+
+func isDirWritable(path string) error {
+	file, err := os.CreateTemp(path, ".permcheck")
+	if err != nil {
+		return err
+	}
+	file.Close()
+	os.Remove(file.Name())
+
+	return nil
+}
+
+func isFileAccessible(path string) error {
 	stat, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -164,18 +194,17 @@ func isPathAccessible(path string) error {
 
 func main() {
 	var app App
-
-	// check template is fine
 	app.template = template.Must(template.New("home").ParseFiles("ui/home.html"))
 
 	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
+	flag.StringVar(&app.uploadDir, "upload-dir", "", "upload directory. Defaults to cwd")
 
 	flag.Parse()
 
-	// check file is accessible
+	// check download file is accessible
 	downloadPath, exists := app.DownloadPath()
 	if exists {
-		err := isPathAccessible(downloadPath)
+		err := isFileAccessible(downloadPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "download file: %s", err)
 			return
@@ -187,6 +216,32 @@ func main() {
 			return
 		}
 		file.Close()
+	}
+
+	// default to home directory
+	if app.uploadDir == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get current working directory: %s\n", err)
+			return
+		}
+		app.uploadDir = dir
+	}
+
+	// BUG: we don't bother checking this in the http handler. Lazy.
+	// check upload directory is valid
+	info, err := os.Stat(app.uploadDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to access directory: %s\n", err)
+		return
+	}
+	if !info.IsDir() {
+		fmt.Fprintf(os.Stderr, "Not a directory: %s\n", app.uploadDir)
+		return
+	}
+	if err := isDirWritable(app.uploadDir); err != nil {
+		fmt.Fprintf(os.Stderr, "directory is not writable: %s\n", err)
+		return
 	}
 
 	// register handlers
