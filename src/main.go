@@ -15,7 +15,7 @@ import (
 
 type App struct {
 	downloadPath string
-	uploadTemplate *template.Template
+	template *template.Template
 }
 
 func (app *App) download(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +50,8 @@ func (app *App) download(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (app *App) getUpload(w http.ResponseWriter, r *http.Request) {
-	err := app.uploadTemplate.Execute(w, nil)
+func (app *App) home(w http.ResponseWriter, r *http.Request) {
+	err := app.template.Execute(w, nil)
 	if err != nil {
 		panic(err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -152,7 +152,7 @@ func main() {
 	var app App
 
 	// check template is fine
-	app.uploadTemplate = template.Must(template.New("upload").ParseFiles("ui/upload.html"))
+	app.template = template.Must(template.New("home").ParseFiles("ui/home.html"))
 
 	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
 	flag.Parse()
@@ -178,8 +178,8 @@ func main() {
 
 	// register handlers
 	mux := http.NewServeMux()
+	mux.HandleFunc("/", app.home)
 	mux.HandleFunc("/download", app.download)
-	mux.HandleFunc("GET /upload", app.getUpload)
 	mux.HandleFunc("POST /upload", app.postUpload)
 	handler := logHandler(mux)
 
@@ -198,28 +198,16 @@ func main() {
 	}
 	ipv4 := ip.IP.To4()
 	url := fmt.Sprintf("http://%s%s", ipv4, server.Addr)
-
-	urlUpload := fmt.Sprintf("%s/upload", url)
-	qr, err := qrcode.New(urlUpload, qrcode.Low)
-	if err != nil {
-		// show error but dont exit.
-		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s", err)
-	} else {
-		fmt.Print("Upload QR:")
-		fmt.Print(qr.ToSmallString(true))
-	}
-
-	urlDownload := fmt.Sprintf("%s/download", url)
-	qr, err = qrcode.New(urlDownload, qrcode.Low)
-	if err != nil {
-		// show error but dont exit.
-		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s", err)
-	} else {
-		fmt.Print("Download QR:")
-		fmt.Print(qr.ToSmallString(true))
-	}
-
 	fmt.Printf("Listening on %s\n", url)
+
+	qr, err := qrcode.New(url, qrcode.Low)
+	if err != nil {
+		// show error but dont exit.
+		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s", err)
+	} else {
+		fmt.Print(qr.ToSmallString(true))
+	}
+
 	err = server.ListenAndServe()
 	if err != nil {
 		panic(err)
