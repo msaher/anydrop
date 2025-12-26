@@ -18,8 +18,17 @@ type App struct {
 	template *template.Template
 }
 
+func (app *App) DownloadPath() (string, bool) {
+	exists := app.downloadPath != ""
+	return app.downloadPath, exists
+}
+
 func (app *App) download(w http.ResponseWriter, r *http.Request) {
-	path := app.downloadPath
+	path, exists := app.DownloadPath()
+	if !exists {
+		http.Error(w, "No path to download", 400)
+		return
+	}
 
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -51,7 +60,10 @@ func (app *App) download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) home(w http.ResponseWriter, r *http.Request) {
-	err := app.template.Execute(w, nil)
+	data := make(map[string]any)
+	_, showDownload := app.DownloadPath()
+	data["showDownload"] = showDownload
+	err := app.template.Execute(w, data)
 	if err != nil {
 		panic(err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -155,26 +167,25 @@ func main() {
 	app.template = template.Must(template.New("home").ParseFiles("ui/home.html"))
 
 	flag.StringVar(&app.downloadPath, "download", "", "file to download on /download")
+
 	flag.Parse()
 
-	if app.downloadPath == "" {
-		fmt.Fprintf(os.Stderr, "must specify a -download path")
-		return
+	// check file is accessible
+	downloadPath, exists := app.DownloadPath()
+	if exists {
+		err := isPathAccessible(downloadPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "download file: %s", err)
+			return
+		}
+		// try to open it just incase
+		file, err := os.Open(downloadPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "download file: %s", err)
+			return
+		}
+		file.Close()
 	}
-
-	// check file is accessiable
-	err := isPathAccessible(app.downloadPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "download file: %s", err)
-		return
-	}
-	// try to open it just incase
-	file, err := os.Open(app.downloadPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "download file: %s", err)
-		return
-	}
-	file.Close()
 
 	// register handlers
 	mux := http.NewServeMux()
