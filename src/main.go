@@ -16,7 +16,11 @@ import (
 	"strings"
 	"crypto/rand"
 	"encoding/hex"
+	_ "embed"
 )
+
+//go:embed ui/home.html
+var homeTemplate string
 
 type App struct {
 	downloadPath string
@@ -240,7 +244,7 @@ func isFileAccessible(path string) error {
 
 func main() {
 	var app App
-	app.template = template.Must(template.New("home").ParseFiles("ui/home.html"))
+	app.template = template.Must(template.New("home").Parse(homeTemplate))
 
 	token, err := newToken(8)
 	if err != nil {
