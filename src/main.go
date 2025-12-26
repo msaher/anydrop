@@ -13,6 +13,7 @@ import (
 	"log"
 	"errors"
 	"io/fs"
+	"strings"
 )
 
 type App struct {
@@ -68,7 +69,13 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 	if exists {
 		data["downloadBasename"] = filepath.Base(downloadPath)
 	}
-	err := app.template.Execute(w, data)
+	uploadDir, err := collapseHome(app.uploadDir)
+	if err != nil {
+		uploadDir = app.uploadDir
+	}
+	data["uploadDir"] = uploadDir
+
+	err = app.template.Execute(w, data)
 	if err != nil {
 		panic(err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -148,6 +155,20 @@ func myIp() (*net.IPNet, error) {
 	}
 
 	return nil, fmt.Errorf("couldn't find an Ipv4 address")
+}
+
+// Changes /home/user/foo to ~/foo
+func collapseHome(path string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(path, home) {
+		return path, nil
+	}
+
+	collapsed := "~" + path[len(home):]
+	return collapsed, nil
 }
 
 func uniquePath(dir, name string) (string, error) {
