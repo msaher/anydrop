@@ -18,6 +18,8 @@ Want to receive file in a specific directory?
 $ anydrop -upload-dir ~/docs
 ```
 
+See `anydrop -help` for full usage
+
 # Features
 
 - Convenient CLI interface
