@@ -241,14 +241,15 @@ func isFileAccessible(path string) error {
 	return nil
 }
 
-func main() {
+
+func entryPoint() int {
 	var app App
 	app.template = template.Must(template.New("home").Parse(homeTemplate))
 
 	token, err := newToken(8)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Can't create token: %s\n", err)
-		return
+		return 1
 	}
 	app.token = token
 
@@ -263,14 +264,14 @@ func main() {
 	if exists {
 		err := isFileAccessible(downloadPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "download file: %s", err)
-			return
+			fmt.Fprintf(os.Stderr, "download file: %s\n", err)
+			return 1
 		}
 		// try to open it just incase
 		file, err := os.Open(downloadPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "download file: %s", err)
-			return
+			fmt.Fprintf(os.Stderr, "download file: %s\n", err)
+			return 1
 		}
 		file.Close()
 	}
@@ -280,7 +281,7 @@ func main() {
 		dir, err := os.Getwd()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to get current working directory: %s\n", err)
-			return
+			return 1
 		}
 		app.uploadDir = dir
 	}
@@ -290,15 +291,15 @@ func main() {
 	info, err := os.Stat(app.uploadDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to access directory: %s\n", err)
-		return
+		return 1
 	}
 	if !info.IsDir() {
 		fmt.Fprintf(os.Stderr, "Not a directory: %s\n", app.uploadDir)
-		return
+		return 1
 	}
 	if err := isDirWritable(app.uploadDir); err != nil {
 		fmt.Fprintf(os.Stderr, "directory is not writable: %s\n", err)
-		return
+		return 1
 	}
 
 	// register handlers
@@ -329,7 +330,7 @@ func main() {
 	qr, err := qrcode.New(url, qrcode.Low)
 	if err != nil {
 		// show error but dont exit.
-		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s", err)
+		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s\n", err)
 	} else {
 		fmt.Print(qr.ToSmallString(true))
 	}
@@ -338,4 +339,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	return 0
+}
+
+func main() {
+	exitCode := entryPoint()
+	os.Exit(exitCode)
 }
