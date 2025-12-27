@@ -6,6 +6,10 @@ Unlike solutions from multibillion-dollar corporations, this one doesn't nag you
 
 Motivation: Wanted to move a large file from my phone. Existing solutions were broken or forced me to use the internet and involve a third party for something so simple.
 
+
+<img width="810" height="634" alt="qr" src="https://github.com/user-attachments/assets/c340e304-de4b-42d2-90c0-ace877e4fd34" />
+
+
 Want to let others download a file?
 
 ```
