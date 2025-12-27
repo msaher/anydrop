@@ -118,8 +118,8 @@ func (app *App) postUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "File uploaded: %s\n", header.Filename)
-	log.Printf("Uploaded file: %s from %s", header.Filename, r.RemoteAddr)
+	fmt.Fprintf(w, "file uploaded: %s\n", header.Filename)
+	log.Printf("uploaded file: %s from %s", header.Filename, r.RemoteAddr)
 }
 
 func (app *App) withToken(next http.Handler) http.Handler {
@@ -248,7 +248,7 @@ func entryPoint() int {
 
 	token, err := newToken(8)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Can't create token: %s\n", err)
+		fmt.Fprintf(os.Stderr, "can't create token: %s\n", err)
 		return 1
 	}
 	app.token = token
@@ -280,7 +280,7 @@ func entryPoint() int {
 	if app.uploadDir == "" {
 		dir, err := os.Getwd()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get current working directory: %s\n", err)
+			fmt.Fprintf(os.Stderr, "failed to get current working directory: %s\n", err)
 			return 1
 		}
 		app.uploadDir = dir
@@ -290,11 +290,11 @@ func entryPoint() int {
 	// check upload directory is valid
 	info, err := os.Stat(app.uploadDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to access directory: %s\n", err)
+		fmt.Fprintf(os.Stderr, "failed to access directory: %s\n", err)
 		return 1
 	}
 	if !info.IsDir() {
-		fmt.Fprintf(os.Stderr, "Not a directory: %s\n", app.uploadDir)
+		fmt.Fprintf(os.Stderr, "not a directory: %s\n", app.uploadDir)
 		return 1
 	}
 	if err := isDirWritable(app.uploadDir); err != nil {
@@ -331,7 +331,7 @@ func entryPoint() int {
 	qr, err := qrcode.New(url, qrcode.Low)
 	if err != nil {
 		// show error but dont exit.
-		fmt.Fprintf(os.Stderr, "Failed to create qrcode: %s\n", err)
+		fmt.Fprintf(os.Stderr, "failed to create qrcode: %s\n", err)
 	} else {
 		fmt.Print(qr.ToSmallString(true))
 	}
