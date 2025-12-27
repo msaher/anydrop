@@ -255,7 +255,7 @@ func entryPoint() int {
 
 	flag.StringVar(&app.downloadPath, "download", "", "file to download")
 	flag.StringVar(&app.uploadDir, "upload-dir", "", "upload directory (default cwd)")
-	port := flag.Int("port", 8000, "port to listen to")
+	port := flag.Int("port", 8866, "port to listen to")
 
 	flag.Parse()
 
