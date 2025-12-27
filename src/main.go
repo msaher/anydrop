@@ -321,7 +321,8 @@ func entryPoint() int {
 
 	ip, err := myIp()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "failed to find ip: %s\n", err)
+		return 1
 	}
 	ipv4 := ip.IP.To4()
 	url := fmt.Sprintf("http://%s%s?token=%s", ipv4, server.Addr, app.token)
@@ -337,7 +338,8 @@ func entryPoint() int {
 
 	err = server.ListenAndServe()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "server failed: %s\n", err)
+		return 1
 	}
 
 	return 0
