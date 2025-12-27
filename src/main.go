@@ -259,6 +259,12 @@ func entryPoint() int {
 
 	flag.Parse()
 
+	args := flag.Args()
+	if len(args) != 0 {
+		flag.Usage()
+		return 1
+	}
+
 	// check download file is accessible
 	downloadPath, exists := app.DownloadPath()
 	if exists {
